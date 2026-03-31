@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Nova Blackjack</title>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+        }
+        .main-container { display: flex; flex: 1; overflow: hidden; }
+        .sidebar {
+            width: 300px; background: rgba(0, 0, 0, 0.5);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px; display: flex; flex-direction: column; gap: 15px;
+        }
+        .stats-card { background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 10px; }
+        .stats-val { font-weight: bold; color: gold; font-size: 1.1em; }
+        #statsChart { background: #111; border-radius: 8px; width: 100%; height: 130px; margin-top: 10px; border: 1px solid #333; }
+        .game-area { flex: 1; padding: 20px; text-align: center; overflow-y: auto; }
+        .top-bar {
+            display: flex; justify-content: space-between; padding: 15px 40px;
+            background: rgba(0, 0, 0, 0.3); align-items: center;
+        }
+        .action-row { display: flex; justify-content: center; align-items: center; gap: 15px; margin-top: 20px; }
+        
+        /* Suppression des flèches sur l'input de mise */
+        .bet-input {
+            padding: 12px; border-radius: 30px; border: none; width: 90px;
+            text-align: center; font-size: 18px; font-weight: bold; outline: none;
+            -moz-appearance: textfield; /* Firefox */
+        }
+        .bet-input::-webkit-outer-spin-button,
+        .bet-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .play-btn {
+            padding: 15px 40px; font-size: 18px; border: none; border-radius: 40px;
+            background: gold; cursor: pointer; font-weight: bold;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+        }
+        .cards { display: flex; justify-content: center; gap: 10px; margin: 10px; min-height: 110px; }
+        .card {
+            width: 75px; height: 105px; background: white; border-radius: 10px;
+            display: flex; flex-direction: column; justify-content: space-between;
+            padding: 8px; font-weight: bold; font-size: 18px; color: black;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.5); animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-15px); } to { opacity: 1; transform: translateY(0); } }
+        .red { color: #d32f2f; }
+        .hand { margin: 15px 0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; }
+        .controls button, .ins-btn {
+            padding: 12px 25px; margin: 5px; font-size: 16px; border: none;
+            border-radius: 25px; background: gold; cursor: pointer; font-weight: bold;
+        }
+        .ins-box {
+            background: rgba(255, 215, 0, 0.1); border: 2px solid gold;
+            padding: 20px; border-radius: 15px; display: inline-block; margin-top: 10px;
+        }
+        .hidden { display: none !important; }
+        #result { font-size: 32px; margin: 20px; height: 40px; font-weight: bold; text-transform: uppercase; }
+        .win { color: #4CAF50; } .lose { color: #ff5252; } .push { color: #ffd740; }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <div style="font-size: 24px; font-weight: bold; letter-spacing: 2px; color: gold;">NOVA BLACKJACK</div>
+    <div style="text-align: right;">
+        <div style="font-size: 20px;">Balance: <span id="balance" style="color: gold;">$1000</span></div>
+        <button onclick="resetBalance()" style="background:#ff4d4d; color:white; border:none; padding:4px 8px; border-radius:4px; font-size:10px; cursor:pointer; margin-top:5px;">RESET ALL</button>
+    </div>
+</div>
+
+<div class="main-container">
+    <div class="sidebar">
+        <h3>Statistics</h3>
+        <div class="stats-card">Hands Played: <div id="statPlayed" class="stats-val">0</div></div>
+        <div class="stats-card">Hands Won: <div id="statWon" class="stats-val">0</div></div>
+        <div class="stats-card">Win Rate: <div id="statRate" class="stats-val">0%</div></div>
+        <div class="stats-card">Total Wagered: <div id="statWagered" class="stats-val">$0</div></div>
+        <div class="stats-card">Net Profit/Loss: <div id="statProfit" class="stats-val">$0</div></div>
+        <canvas id="statsChart"></canvas>
+    </div>
+
+    <div class="game-area">
+        <h2>Dealer <span id="dealerTotal" style="color: gold;"></span></h2>
+        <div class="cards" id="dealerCards"></div>
+        <div id="playerArea"></div>
+
+        <div id="insuranceUI" class="ins-box hidden">
+            <div style="font-size: 20px; margin-bottom: 15px; font-weight: bold;">Insurance?</div>
+            <button class="ins-btn" onclick="applyInsurance()" style="background: #4CAF50; color: white; width: 100px;">YES</button>
+            <button class="ins-btn" onclick="declineInsurance()" style="background: #ff5252; color: white; width: 100px;">NO</button>
+        </div>
+
+        <div class="controls hidden" id="controls">
+            <button onclick="hit()">HIT</button>
+            <button onclick="stay()">STAY</button>
+            <button onclick="doubleDown()" id="doubleBtn">DOUBLE</button>
+            <button onclick="split()" id="splitBtn">SPLIT</button>
+        </div>
+
+        <h2 id="result"></h2>
+        <div class="action-row" id="betArea">
+            <input type="number" id="bet" class="bet-input" value="100">
+            <button class="play-btn" onclick="startGame()">DEAL CARDS</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let balance = 1000, totalWagered = 0, history = [1000], handsPlayed = 0, handsWon = 0;
+    let deck = [], dealerHand = [], playerHands = [], currentHandIndex = 0, bets = [], gameActive = false;
+
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    function updateStats() {
+        document.getElementById("statPlayed").textContent = handsPlayed;
+        document.getElementById("statWon").textContent = handsWon;
+        let rate = handsPlayed > 0 ? Math.round((handsWon / handsPlayed) * 100) : 0;
+        document.getElementById("statRate").textContent = rate + "%";
+        document.getElementById("statWagered").textContent = `$${totalWagered}`;
+        let profit = balance - 1000;
+        let el = document.getElementById("statProfit");
+        el.textContent = (profit >= 0 ? "+" : "") + "$" + profit;
+        el.style.color = profit >= 0 ? "#4CAF50" : "#ff5252";
+        drawChart();
+    }
+
+    function drawChart() {
+        const canvas = document.getElementById('statsChart'); const ctx = canvas.getContext('2d');
+        canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+        if(history.length < 2) return;
+
+        const startVal = 1000;
+        let maxVal = Math.max(...history, startVal) + 50;
+        let minVal = Math.min(...history, startVal) - 50;
+        let range = maxVal - minVal;
+
+        let maxPoints = Math.max(history.length, 10); 
+        let stepX = canvas.width / (maxPoints - 1);
+
+        let zeroY = canvas.height - ((startVal - minVal) / range) * canvas.height;
+        ctx.strokeStyle = "#444"; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(0, zeroY); ctx.lineTo(canvas.width, zeroY); ctx.stroke(); ctx.setLineDash([]);
+
+        ctx.lineWidth = 3;
+        ctx.lineJoin = "round";
+
+        for(let i=0; i < history.length - 1; i++) {
+            let x1 = i * stepX;
+            let y1 = canvas.height - ((history[i] - minVal) / range) * canvas.height;
+            let x2 = (i + 1) * stepX;
+            let y2 = canvas.height - ((history[i+1] - minVal) / range) * canvas.height;
+
+            ctx.beginPath();
+            ctx.strokeStyle = history[i+1] >= startVal ? "#4CAF50" : "#ff5252";
+            
+            let cpX = (x1 + x2) / 2;
+            ctx.moveTo(x1, y1);
+            ctx.bezierCurveTo(cpX, y1, cpX, y2, x2, y2);
+            ctx.stroke();
+        }
+    }
+
+    function createDeck() {
+        let suits = ["♠", "♥", "♦", "♣"], values = [{n:"A",v:11},{n:"2",v:2},{n:"3",v:3},{n:"4",v:4},{n:"5",v:5},{n:"6",v:6},{n:"7",v:7},{n:"8",v:8},{n:"9",v:9},{n:"10",v:10},{n:"J",v:10},{n:"Q",v:10},{n:"K",v:10}];
+        deck = []; for(let s of suits) for(let v of values) deck.push({...v, suit:s});
+        deck.sort(() => Math.random() - 0.5);
+    }
+
+    async function startGame() {
+        let betVal = parseInt(document.getElementById("bet").value);
+        if(isNaN(betVal) || betVal > balance || betVal <= 0) return alert("Invalid bet");
+        
+        document.getElementById("dealerTotal").textContent = "";
+        balance -= betVal; totalWagered += betVal; handsPlayed++; updateBalance(); updateStats();
+        createDeck(); dealerHand = []; playerHands = [[]]; bets = [betVal]; currentHandIndex = 0; gameActive = true;
+        document.getElementById("result").textContent = ""; document.getElementById("betArea").classList.add("hidden");
+        
+        playerHands[0].push(deck.pop()); render(); await sleep(400);
+        dealerHand.push(deck.pop()); render(); await sleep(400);
+        playerHands[0].push(deck.pop()); render(); await sleep(400);
+        dealerHand.push(deck.pop()); render();
+
+        if (dealerHand[0].v >= 10) {
+            document.getElementById("insuranceUI").classList.remove("hidden");
+        } else if (getTotal(playerHands[0]) === 21) {
+            endDealer(true);
+        } else {
+            document.getElementById("controls").classList.remove("hidden");
+        }
+    }
+
+    function applyInsurance() {
+        let refund = bets[0] / 2; balance += refund;
+        document.getElementById("insuranceUI").classList.add("hidden");
+        document.getElementById("result").textContent = `INSURANCE USED`; document.getElementById("result").className = "push";
+        finishGame();
+    }
+
+    function declineInsurance() {
+        document.getElementById("insuranceUI").classList.add("hidden");
+        if (getTotal(playerHands[0]) === 21) endDealer(true);
+        else document.getElementById("controls").classList.remove("hidden");
+    }
+
+    async function doubleDown() {
+        let b = bets[currentHandIndex]; if (balance < b) return;
+        balance -= b; totalWagered += b; bets[currentHandIndex] *= 2; updateBalance(); updateStats();
+        playerHands[currentHandIndex].push(deck.pop()); render();
+        await sleep(500); nextHand();
+    }
+
+    function split() {
+        let hand = playerHands[currentHandIndex], b = bets[currentHandIndex];
+        if (hand.length !== 2 || hand[0].n !== hand[1].n || balance < b) return;
+        balance -= b; totalWagered += b; updateBalance(); updateStats();
+        let newHand = [hand.pop()]; hand.push(deck.pop()); newHand.push(deck.pop());
+        playerHands.splice(currentHandIndex + 1, 0, newHand); bets.splice(currentHandIndex + 1, 0, b);
+        render();
+    }
+
+    function createCard(c, hidden=false) {
+        let div = document.createElement("div"); div.className = "card";
+        if(hidden) { div.style.background = "#222"; div.style.border = "1px solid #444"; return div; }
+        div.classList.add((c.suit==="♥"||c.suit==="♦")?"red":"black");
+        div.innerHTML = `<div>${c.n}${c.suit}</div><div style="text-align:right">${c.suit}</div>`;
+        return div;
+    }
+
+    function render() {
+        let dDiv = document.getElementById("dealerCards"); dDiv.innerHTML = "";
+        if(dealerHand.length > 0) {
+            dDiv.appendChild(createCard(dealerHand[0]));
+            if(gameActive && dealerHand.length > 1) dDiv.appendChild(createCard(null, true));
+            else if(!gameActive) {
+                for(let i=1; i<dealerHand.length; i++) dDiv.appendChild(createCard(dealerHand[i]));
+                document.getElementById("dealerTotal").textContent = ` (${getTotal(dealerHand)})`;
+            }
+        }
+        let pArea = document.getElementById("playerArea"); pArea.innerHTML = "";
+        playerHands.forEach((h, i) => {
+            let div = document.createElement("div"); div.className = "hand";
+            let score = getTotal(h);
+            div.innerHTML = `HAND ${i+1} (${score}) ${score > 21 ? '<b style="color:#ff5252">BUST!</b>' : ''}`;
+            let cards = document.createElement("div"); cards.className = "cards";
+            h.forEach(c => cards.appendChild(createCard(c)));
+            div.appendChild(cards); pArea.appendChild(div);
+        });
+        checkButtons();
+    }
+
+    async function hit() { playerHands[currentHandIndex].push(deck.pop()); render(); if(getTotal(playerHands[currentHandIndex]) > 21) { await sleep(500); nextHand(); } }
+    function stay() { nextHand(); }
+    function nextHand() { currentHandIndex++; if(currentHandIndex >= playerHands.length) endDealer(); else render(); }
+
+    async function endDealer(isBJ=false) {
+        gameActive = false; document.getElementById("controls").classList.add("hidden"); 
+        
+        let allBust = playerHands.every(h => getTotal(h) > 21);
+        
+        if(!isBJ && !allBust) {
+            render(); await sleep(600);
+            while(getTotal(dealerHand) < 17) { dealerHand.push(deck.pop()); render(); await sleep(600); }
+        } else {
+            render(); 
+        }
+
+        let totalBet = bets.reduce((a,b)=>a+b, 0), winSum = 0;
+        playerHands.forEach((h, i) => {
+            let p = getTotal(h), d = getTotal(dealerHand);
+            if(isBJ && p === 21) { balance += bets[i]*2.5; winSum += bets[i]*2.5; }
+            else if(p <= 21 && (d > 21 || p > d)) { balance += bets[i]*2; winSum += bets[i]*2; }
+            else if(p <= 21 && p === d) { balance += bets[i]; winSum += bets[i]; }
+        });
+
+        let res = document.getElementById("result");
+        if(winSum > totalBet) { res.textContent = `WIN! +$${winSum}`; res.className = "win"; handsWon++; }
+        else if(winSum === totalBet && totalBet > 0) { res.textContent = `PUSH! +$${winSum}`; res.className = "push"; }
+        else { res.textContent = `LOSE! -$${totalBet - winSum}`; res.className = "lose"; }
+        finishGame();
+    }
+
+    function finishGame() {
+        gameActive = false; history.push(balance); updateBalance(); updateStats();
+        document.getElementById("betArea").classList.remove("hidden");
+    }
+
+    function checkButtons() {
+        let h = playerHands[currentHandIndex]; if(!h) return;
+        document.getElementById("doubleBtn").disabled = h.length !== 2 || balance < bets[currentHandIndex];
+        document.getElementById("splitBtn").disabled = h.length !== 2 || h[0].n !== h[1].n || balance < bets[currentHandIndex];
+    }
+
+    function getTotal(h) { let t = h.reduce((s,c)=>s+c.v,0), a = h.filter(c=>c.n==="A").length; while(t > 21 && a > 0) { t -= 10; a--; } return t; }
+    function updateBalance() { document.getElementById("balance").textContent = `$${balance}`; }
+    function resetBalance() { if(!gameActive) { balance = 1000; totalWagered = 0; handsPlayed = 0; handsWon = 0; history = [1000]; updateBalance(); updateStats(); } }
+    window.onload = () => drawChart();
+</script>
+</body>
+</html>
